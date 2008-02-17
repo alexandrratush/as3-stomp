@@ -26,9 +26,23 @@ package org.codehaus.stomp.headers
 		 **/
 		public static const CLIENT_ID : String = "client-id";
 		
+		public static const LOGIN : String = "login";
+		
+		public static const PASSCODE : String = "passcode";
+		
 		public function set clientID (id : String) : void
 		{
 			addHeader(CLIENT_ID, id);
+		}
+		
+		public function set login(username: String) : void
+		{
+			addHeader(LOGIN, username);
+		}
+		
+		public function set passcode(password: String) : void
+		{
+			addHeader(PASSCODE, password);
 		}
 		
 	}
