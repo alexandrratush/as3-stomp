@@ -28,9 +28,12 @@ package org.codehaus.stomp {
 	import flash.utils.ByteArray;
 	import flash.utils.Timer;
 	
+	import mx.utils.ObjectUtil;
+	
 	import org.codehaus.stomp.event.*;
 	import org.codehaus.stomp.frame.*;
 	import org.codehaus.stomp.headers.*;
+	import org.rxr.utils.ByteArrayReader;
 	
 	[Event(name="connected", type="org.codehaus.stomp.event.ConnectedEvent")]
 	
@@ -44,7 +47,7 @@ package org.codehaus.stomp {
   
 		private static const NEWLINE : String = "\n";
 		private static const BODY_START : String = "\n\n";
-		private static const NULL_BYTE : String = "\u0000";
+		private static const NULL_BYTE : int = 0x00;
 		
     	private const socket : Socket = new Socket();
  		
@@ -102,7 +105,7 @@ package org.codehaus.stomp {
 			if (connectTimer && connectTimer.running) connectTimer.stop();
 			
 			var h : Object = connectHeaders ? connectHeaders.getHeaders() : {}; 
-			transmit("CONNECT", connectHeaders);
+			transmit("CONNECT", h);
 			socketConnected = true;
     	}
 	
@@ -162,18 +165,41 @@ package org.codehaus.stomp {
 
 		}
 		
-		public function send (destination : String, message : String, headers : SendHeaders = null, bytesMessage : Boolean = true) : void
+		public function send (destination : String, message : Object, headers : SendHeaders = null) : void
+		{
+			var h : Object = headers ? headers.getHeaders() : {};				
+			h['destination'] = destination;
+			
+			var messageBytes : ByteArray = new ByteArray();					
+			if(message is ByteArray) 
+				messageBytes.writeBytes(ByteArray(message), 0, message.length);
+			else if(message is String)
+				messageBytes.writeUTFBytes(String(message));
+			else if(message is int)
+				messageBytes.writeInt(int(message));
+			else if(message is Number)
+				messageBytes.writeDouble(Number(message));
+			else if(message is Boolean)
+				messageBytes.writeBoolean(Boolean(message));
+			else if(!ObjectUtil.isSimple(message))
+				messageBytes.writeObject(message);
+			else if(message is Array)
+				messageBytes.writeObject(message as Array);
+
+			h['content-length'] = messageBytes.length;
+
+			transmit("SEND", h,  messageBytes);
+		}
+		
+		public function sendTextMessage(destination : String, message : String, headers : SendHeaders = null) : void
 		{
 			var h : Object = headers ? headers.getHeaders() : {};
-				
 			h['destination'] = destination;
-			if (bytesMessage)
-			{
-				var bytes : ByteArray = new ByteArray();
-				bytes.writeUTFBytes(message);
-			 	h['content-length'] = bytes.length;
-			 }
-			transmit("SEND", h,  message);
+			
+			var messageBytes : ByteArray = new ByteArray();
+			messageBytes.writeUTFBytes(message);
+			
+			transmit("SEND", h,  messageBytes);
 		}
 		
 		public function begin (transaction : String, headers : BeginHeaders = null) : void
@@ -221,18 +247,19 @@ package org.codehaus.stomp {
 			transmit("DISCONNECT", {});
 		}	
 		
-		private function transmit (command : String, headers : Object, body : String = "") : void
+		private function transmit (command : String, headers : Object, body : ByteArray = null) : void
 		{
-			var transmission : String = command;
+			var transmission : ByteArray = new ByteArray();
+			transmission.writeUTFBytes(command);
 
 			for (var header: String in headers)
-				transmission += NEWLINE + header + ":" + headers[header];	       
+				transmission.writeUTFBytes( NEWLINE + header + ":" + headers[header] );	       
 	        
-	        transmission += BODY_START;
-			transmission += body;
-	        transmission += NULL_BYTE;
+	        transmission.writeUTFBytes( BODY_START );
+			if (body) transmission.writeBytes( body, 0, body.length )
+	        transmission.writeByte( NULL_BYTE );
 	        
-	        socket.writeUTFBytes( transmission );
+	        socket.writeBytes( transmission, 0, transmission.length );
 	        socket.flush();
 		
 		}
@@ -246,26 +273,25 @@ package org.codehaus.stomp {
 			}
 		}
 	
+		private var frameReader : FrameReader;
+		
 	    private function onData(event : ProgressEvent):void {
 			
-			var frame : String = Socket(event.target).readUTFBytes(socket.bytesAvailable);
-			var frameStart : int = frame.search(/\S/);
-			var commandEnd : int = frame.indexOf(NEWLINE, frameStart);
-			var bodyStart : int = frame.indexOf(BODY_START);
+			if (!frameReader)
+				frameReader = new FrameReader(new ByteArrayReader(socket));
+			else if(!frameReader.isComplete)
+				frameReader.readBytes(socket)
 			
-			var command : String = frame.slice(frameStart, commandEnd);
-			var body : String = frame.slice(bodyStart + 2);
-			var headers : Object = new Object();
-			
-			var headerString : String = frame.substring(commandEnd+1, bodyStart);
-			var headerValuePairs : Array = headerString.split(NEWLINE);
-			
-			for each (var pair : String in headerValuePairs) 
-			{
-				var separator : int = pair.indexOf(":");
-				headers[pair.substring(0, separator)] = pair.substring(separator+1);
+			if (frameReader.isComplete) {
+				dispatchFrame(frameReader.command, frameReader.headers, frameReader.body);
+				frameReader = null;
 			}
-			
+					
+		}
+
+
+		private function dispatchFrame(command: String, headers: Object, body: ByteArray): void
+		{
 			switch (command) 
 			{				
 				case "CONNECTED":
@@ -300,7 +326,106 @@ package org.codehaus.stomp {
 					throw new Error("UNKNOWN STOMP FRAME");
 				break;
 				
-			}
+			}			
 		}
   	}
 }
+
+
+import org.rxr.utils.ByteArrayReader;
+import flash.utils.ByteArray;
+import flash.utils.IDataInput;
+import org.codehaus.stomp.Stomp;
+	
+internal class FrameReader {
+	
+	private var reader : ByteArrayReader;
+	private var frameComplete: Boolean = false;
+	private var contentLength: int = -1;
+	
+	public var command : String;
+	public var headers : Object;
+	public var body : ByteArray;
+	
+	public function get isComplete(): Boolean
+	{
+		return frameComplete;
+	}
+	
+	public function readBytes(data: IDataInput): void
+	{
+		data.readBytes(reader, reader.length, data.bytesAvailable);
+		processBytes();
+	}
+	
+	private function processBytes(): void
+	{
+		if (!command && reader.scan(0x0A) != -1)
+			processCommand();
+		
+		if (command && !headers && reader.indexOfString("\n\n") != -1)
+			processHeaders();
+		
+		if (command && headers && bodyComplete())
+			processBody();
+		
+		if (command && headers && body)
+			frameComplete = true;
+						
+	}
+
+	private function processCommand(): void
+	{
+		command = reader.readLine();
+	}
+	
+	private function processHeaders(): void
+	{
+		headers = new Object();
+					
+		var headerString : String = reader.readUntilString("\n\n");
+		var headerValuePairs : Array = headerString.split("\n");
+		
+		for each (var pair : String in headerValuePairs) 
+		{
+			var separator : int = pair.indexOf(":");
+			headers[pair.substring(0, separator)] = pair.substring(separator+1);
+		}
+		
+		if(headers["content-length"])
+			contentLength = headers["content-length"];
+		
+		reader.forward();		
+	}
+	
+	private function processBody(): void
+	{
+	 	body = reader.readFor(contentLength);	
+	}
+	
+	private function bodyComplete() : Boolean
+	{
+		if(contentLength != -1) {
+			if(contentLength > reader.bytesAvailable)
+				return false
+		}
+		else {
+			var nullByteIndex: int = reader.scanBack(0x00);
+			if(nullByteIndex != -1)
+				contentLength = nullByteIndex;	
+			else
+				return false
+		}
+
+		return true
+	}
+	
+	public function FrameReader(reader: ByteArrayReader): void
+	{
+		this.reader = reader;
+		processBytes();
+	}
+					
+	
+}
+	
