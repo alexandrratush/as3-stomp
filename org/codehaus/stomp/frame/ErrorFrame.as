@@ -18,12 +18,14 @@
 
 package org.codehaus.stomp.frame
 {
+	import flash.utils.ByteArray;
+	
 	public class ErrorFrame
 	{
-		public var body : String;
+		public var body : ByteArray;
 		public var headers : Object;
 
-		public function ErrorFrame (body : String, headers : Object)
+		public function ErrorFrame (body : ByteArray, headers : Object)
 		{
 			this.body = body;
 			this.headers = headers;
