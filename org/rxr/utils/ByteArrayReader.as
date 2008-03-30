@@ -77,7 +77,7 @@ package org.rxr.utils
 		public function scan(byte: int, offset: int = 0): int
 		{
 			var index: int = -1;
-			for (var i: int=offset; i<length; i++){
+			for (var i: int=offset; i<bytesAvailable; i++){
 				if (peek(i) == byte){
 					index = i; 
 					break;
