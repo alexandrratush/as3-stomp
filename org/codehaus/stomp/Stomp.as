@@ -18,7 +18,7 @@
  
  /*
  	Version 0.1 : R Jewson (rjewson at gmail dot com).  First release, only for reciept of messages.
- 	Version 0.4 : Derek Wischusen (dwischus at flexonrails dot net).  
+ 	Version 0.41 : Derek Wischusen (dwischus at flexonrails dot net) and Peter Mulreid.  
  */
 
 package org.codehaus.stomp {
@@ -51,6 +51,7 @@ package org.codehaus.stomp {
 		
     	private const socket : Socket = new Socket();
  		
+ 		private var buffer:ByteArrayReader = new ByteArrayReader();
 		private var server : String;
 		private var port : int;
 		private var connectHeaders : ConnectHeaders;			
@@ -276,19 +277,27 @@ package org.codehaus.stomp {
 		private var frameReader : FrameReader;
 		
 	    private function onData(event : ProgressEvent):void {
-			
-			if (!frameReader)
-				frameReader = new FrameReader(new ByteArrayReader(socket));
-			else if(!frameReader.isComplete)
-				frameReader.readBytes(socket)
-			
+	    	if (buffer.bytesAvailable == 0)
+	    		buffer.length = 0;
+	    	socket.readBytes(buffer, buffer.length, socket.bytesAvailable);
+	    	while (buffer.bytesAvailable > 0 && processFrame()) {
+	    		// processFrame called once per iteration;
+	    	}
+	    }
+	    private function processFrame():Boolean {
+			if (!frameReader) {
+				frameReader = new FrameReader(buffer);
+			} else {
+				frameReader.processBytes();
+			}
 			if (frameReader.isComplete) {
 				dispatchFrame(frameReader.command, frameReader.headers, frameReader.body);
 				frameReader = null;
+				return true;
+			} else {
+				return false;
 			}
-					
 		}
-
 
 		private function dispatchFrame(command: String, headers: Object, body: ByteArray): void
 		{
@@ -323,7 +332,7 @@ package org.codehaus.stomp {
 				break;
 				
 				default:
-					throw new Error("UNKNOWN STOMP FRAME");
+					throw new Error("UNKNOWN STOMP FRAME '"+command+"'");
 				break;
 				
 			}			
@@ -358,11 +367,11 @@ internal class FrameReader {
 		processBytes();
 	}
 	
-	private function processBytes(): void
+	public function processBytes(): void
 	{
 		if (!command && reader.scan(0x0A) != -1)
 			processCommand();
-		
+
 		if (command && !headers && reader.indexOfString("\n\n") != -1)
 			processHeaders();
 		
@@ -394,13 +403,20 @@ internal class FrameReader {
 		
 		if(headers["content-length"])
 			contentLength = headers["content-length"];
-		
-		reader.forward();		
+			
+		reader.forward();
 	}
 	
 	private function processBody(): void
 	{
-	 	body = reader.readFor(contentLength);	
+		var x:int = reader.scan(0x00);
+		if (contentLength > reader.bytesAvailable) {
+			trace("null found at", x,  ", content length is", contentLength);
+		}
+		body = reader.readFor(contentLength);
+		while (reader.bytesAvailable > 0 && reader.peek(0) <= 27) {
+			reader.forward();
+		}
 	}
 	
 	private function bodyComplete() : Boolean
@@ -410,7 +426,7 @@ internal class FrameReader {
 				return false
 		}
 		else {
-			var nullByteIndex: int = reader.scanBack(0x00);
+			var nullByteIndex: int = reader.scan(0x00);
 			if(nullByteIndex != -1)
 				contentLength = nullByteIndex;	
 			else
