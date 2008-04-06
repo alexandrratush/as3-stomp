@@ -30,6 +30,17 @@ package org.codehaus.stomp.headers
 		
 		public static const PASSCODE : String = "passcode";
 		
+		/**
+		 *  RabbitMQ/AMQP only
+		 */
+		public static const VIRTUAL_HOST: String = "virtual-host";
+		
+		/**
+		 *  RabbitMQ/AMQP only
+		 */
+		public static const REALM: String = "realm";
+		
+		
 		public function set clientID (id : String) : void
 		{
 			addHeader(CLIENT_ID, id);
@@ -44,6 +55,16 @@ package org.codehaus.stomp.headers
 		{
 			addHeader(PASSCODE, password);
 		}
+
+		public function set virtualHost(hostname: String) : void
+		{
+			addHeader(VIRTUAL_HOST, hostname);
+		}
+	
+		public function set realm(realm: String) : void
+		{
+			addHeader(REALM, realm);
+		}					
 		
 	}
 }

@@ -75,6 +75,12 @@ package org.codehaus.stomp.headers
 		 * Used to bind a message to a named transaction.
 		 **/		
 		public static const TRANSACTION : String = 'transaction';
+
+		/**
+		 *  RabbitMQ/AMQP only
+		 */
+		public static const EXCHANGE: String = "exchange";
+		
 		
 		public function set receipt (id : String) : void
 		{
@@ -125,6 +131,10 @@ package org.codehaus.stomp.headers
 		{
 			addHeader(TRANSACTION, id);
 		}
-			
+
+		public function set exchange (exchange : String) : void
+		{
+			addHeader(EXCHANGE, exchange);
+		}			
 	}
 }
