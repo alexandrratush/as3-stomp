@@ -28,8 +28,6 @@ package org.codehaus.stomp {
 	import flash.utils.ByteArray;
 	import flash.utils.Timer;
 	
-	import mx.utils.ObjectUtil;
-	
 	import org.codehaus.stomp.event.*;
 	import org.codehaus.stomp.frame.*;
 	import org.codehaus.stomp.headers.*;
@@ -105,6 +103,8 @@ package org.codehaus.stomp {
  	   	{
 			if (connectTimer && connectTimer.running) connectTimer.stop();
 			
+			dispatchEvent(event.clone());
+			
 			var h : Object = connectHeaders ? connectHeaders.getHeaders() : {}; 
 			transmit("CONNECT", h);
 			socketConnected = true;
@@ -116,7 +116,7 @@ package org.codehaus.stomp {
 			protocolConnected = false;
 			protocolPending = false;
 			disconnectTime = new Date();
-
+			
 			if (!expectDisconnect && autoReconnect) 
 			{
 				connectTimer = new Timer(2000, 5);
@@ -182,10 +182,8 @@ package org.codehaus.stomp {
 				messageBytes.writeDouble(Number(message));
 			else if(message is Boolean)
 				messageBytes.writeBoolean(Boolean(message));
-			else if(!ObjectUtil.isSimple(message))
+			else 
 				messageBytes.writeObject(message);
-			else if(message is Array)
-				messageBytes.writeObject(message as Array);
 
 			h['content-length'] = messageBytes.length;
 
