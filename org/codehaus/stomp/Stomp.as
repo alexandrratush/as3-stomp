@@ -47,7 +47,7 @@ package org.codehaus.stomp {
 		private static const BODY_START : String = "\n\n";
 		private static const NULL_BYTE : int = 0x00;
 		
-    	private const socket : Socket = new Socket();
+    	private var socket : Socket;
  		
  		private var buffer:ByteArrayReader = new ByteArrayReader();
 		private var server : String;
@@ -68,17 +68,17 @@ package org.codehaus.stomp {
 				
   		public function Stomp() 
   		{
-			socket.addEventListener( Event.CONNECT, onConnect );
-	  		socket.addEventListener( Event.CLOSE, onClose );
-      		socket.addEventListener( ProgressEvent.SOCKET_DATA, onData );
-			socket.addEventListener( IOErrorEvent.IO_ERROR, onError );
+
 		}
 	
-		public function connect( server : String = "localhost", port : int = 61613, connectHeaders : ConnectHeaders = null) : void 
+		public function connect( server : String = "localhost", port : int = 61613, connectHeaders : ConnectHeaders = null, socket: Socket = null) : void 
 		{
 			this.server = server;
 			this.port = port
 			this.connectHeaders = connectHeaders;
+			this.socket = socket || new Socket();
+			
+			initializeSocket();
 			doConnect();
 		}
 
@@ -86,6 +86,14 @@ package org.codehaus.stomp {
 		{
 			expectDisconnect = true;
 			socket.close();
+		}
+		
+		private function initializeSocket(): void
+		{
+			socket.addEventListener( Event.CONNECT, onConnect );
+	  		socket.addEventListener( Event.CLOSE, onClose );
+      		socket.addEventListener( ProgressEvent.SOCKET_DATA, onData );
+			socket.addEventListener( IOErrorEvent.IO_ERROR, onError );			
 		}
 		
 		private function doConnect() : void 
@@ -99,7 +107,7 @@ package org.codehaus.stomp {
 			expectDisconnect = false;
 		}
 
- 	   	private function onConnect( event:Event ) : void 
+ 	   	protected function onConnect( event:Event ) : void 
  	   	{
 			if (connectTimer && connectTimer.running) connectTimer.stop();
 			
@@ -108,9 +116,11 @@ package org.codehaus.stomp {
 			var h : Object = connectHeaders ? connectHeaders.getHeaders() : {}; 
 			transmit("CONNECT", h);
 			socketConnected = true;
+			
+			this.dispatchEvent(event.clone());
     	}
 	
-		private function onClose( event:Event ) : void 
+		protected function onClose( event:Event ) : void 
 		{
 			socketConnected = false;
 			protocolConnected = false;
@@ -124,6 +134,8 @@ package org.codehaus.stomp {
 				connectTimer.addEventListener(TimerEvent.TIMER_COMPLETE, onTimerComplete);
 				connectTimer.start();
 			}
+			
+			this.dispatchEvent(event.clone());
 		}
 
 		private function doConnectTimer( event:TimerEvent ):void 
@@ -147,6 +159,7 @@ package org.codehaus.stomp {
 				disconnectTime = now;
 			}
 			errorMessages.push(now + " " + event.type);
+			this.dispatchEvent(event.clone());
 		}
 		
 		public function subscribe(destination : String, headers : SubscribeHeaders = null) : void 

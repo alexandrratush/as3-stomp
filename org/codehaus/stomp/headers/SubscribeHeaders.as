@@ -83,6 +83,13 @@ package org.codehaus.stomp.headers
 		 **/		
 		public static const AMQ_SUBSCRIPTION_NAME : String = "activemq.subcriptionName";
 		
+		/**
+		 *  RabbitMQ/AMQP only
+		 */
+		public static const EXCHANGE: String = "exchange";
+		
+		public static const ROUTING_KEY: String = "routing_key";
+		
 		public function set receipt (id : String) : void
 		{
 			addHeader(SharedHeaders.RECEIPT, id);
@@ -141,6 +148,16 @@ package org.codehaus.stomp.headers
 		public function set amqSubscriptionName (name : String) : void
 		{
 			addHeader(AMQ_SUBSCRIPTION_NAME, name);
+		}
+
+		public function set exchange (exchange : String) : void
+		{
+			addHeader(EXCHANGE, exchange);
+		}			
+
+		public function set routingKey (routingKey : String) : void
+		{
+			addHeader(ROUTING_KEY, routingKey);
 		}
 	}
 }
