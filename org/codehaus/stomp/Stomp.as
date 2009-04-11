@@ -365,7 +365,8 @@ internal class FrameReader {
 	
 	public var command : String;
 	public var headers : Object;
-	public var body : ByteArray;
+	public var body : ByteArray = new ByteArray();
+	private var bodyProcessed:Boolean = false;
 	
 	public function get isComplete(): Boolean
 	{
@@ -386,10 +387,10 @@ internal class FrameReader {
 		if (command && !headers && reader.indexOfString("\n\n") != -1)
 			processHeaders();
 		
-		if (command && headers && bodyComplete())
+		if (command && headers && (bodyProcessed=bodyComplete()))
 			processBody();
 		
-		if (command && headers && body)
+		if (command && headers && bodyProcessed)
 			frameComplete = true;
 						
 	}
@@ -420,31 +421,33 @@ internal class FrameReader {
 	
 	private function processBody(): void
 	{
-		var x:int = reader.scan(0x00);
-		if (contentLength > reader.bytesAvailable) {
-			trace("null found at", x,  ", content length is", contentLength);
-		}
-		body = reader.readFor(contentLength);
 		while (reader.bytesAvailable > 0 && reader.peek(0) <= 27) {
 			reader.forward();
 		}
+		body.position=0;
 	}
 	
-	private function bodyComplete() : Boolean
-	{
+	private function bodyComplete() : Boolean {
 		if(contentLength != -1) {
-			if(contentLength > reader.bytesAvailable)
-				return false
-		}
-		else {
+			if(contentLength > reader.bytesAvailable + body.length) {
+				body.writeBytes(reader.readFor(reader.bytesAvailable));
+				return false;
+			} else {
+				body.writeBytes(reader.readFor(contentLength));
+			}
+		} else {
 			var nullByteIndex: int = reader.scan(0x00);
-			if(nullByteIndex != -1)
-				contentLength = nullByteIndex;	
-			else
-				return false
+			if(nullByteIndex != -1) {
+				if (nullByteIndex > 0) {
+					body.writeBytes(reader.readFor(nullByteIndex));	
+				}
+				contentLength = body.length;
+			} else {
+				body.writeBytes(reader.readFor(reader.bytesAvailable));
+				return false;
+			}
 		}
-
-		return true
+		return true;
 	}
 	
 	public function FrameReader(reader: ByteArrayReader): void
@@ -452,7 +455,5 @@ internal class FrameReader {
 		this.reader = reader;
 		processBytes();
 	}
-					
-	
 }
 	
