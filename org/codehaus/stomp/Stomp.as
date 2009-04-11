@@ -429,11 +429,12 @@ internal class FrameReader {
 	
 	private function bodyComplete() : Boolean {
 		if(contentLength != -1) {
-			if(contentLength > reader.bytesAvailable + body.length) {
+			const len: int = body.length;
+			if(contentLength > reader.bytesAvailable + len) {
 				body.writeBytes(reader.readFor(reader.bytesAvailable));
 				return false;
 			} else {
-				body.writeBytes(reader.readFor(contentLength));
+				body.writeBytes(reader.readFor(contentLength - len));
 			}
 		} else {
 			var nullByteIndex: int = reader.scan(0x00);
