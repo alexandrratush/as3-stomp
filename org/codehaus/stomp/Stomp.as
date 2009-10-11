@@ -18,11 +18,12 @@
  
  /*
  	Version 0.1 : R Jewson (rjewson at gmail dot com).  First release, only for reciept of messages.
- 	Version 0.41 : Derek Wischusen (dwischus at flexonrails dot net) and Peter Mulreid.  
+ 	Version 0.7 : Derek Wischusen (dwischus at flexonrails dot net), Peter Mulreid, and mark81.  
  */
 
 package org.codehaus.stomp {
 	
+	import flash.errors.IOError;
 	import flash.events.*;
 	import flash.net.Socket;
 	import flash.utils.ByteArray;
@@ -34,12 +35,12 @@ package org.codehaus.stomp {
 	import org.rxr.utils.ByteArrayReader;
 	
 	[Event(name="connected", type="org.codehaus.stomp.event.ConnectedEvent")]
-	
 	[Event(name="message", type="org.codehaus.stomp.event.MessageEvent")]
-	
 	[Event(name="receipt", type="org.codehaus.stomp.event.ReceiptEvent")]
-	
 	[Event(name="fault", type="org.codehaus.stomp.event.STOMPErrorEvent")]
+	[Event(name="reconnectFailed", type="org.codehaus.stomp.event.ReconnectFailedEvent")]
+	[Event(name="ioError", type="flash.events.IOErrorEvent")]
+	[Event(name="securityError", type="flash.events.SecurityErrorEvent")]
 	
 	public class Stomp extends EventDispatcher {
   
@@ -52,11 +53,8 @@ package org.codehaus.stomp {
  		private var buffer:ByteArrayReader = new ByteArrayReader();
 		private var server : String;
 		private var port : int;
-		private var connectHeaders : ConnectHeaders;			
-  		private var socketConnected : Boolean   = false;
-		private var protocolPending : Boolean   = false;
-		private var protocolConnected : Boolean = false;
-		private var expectDisconnect : Boolean  = false;
+		private var connectHeaders : ConnectHeaders;
+		
 		private var connectTimer : Timer;
 		private var subscriptions : Array = new Array();
 		
@@ -68,7 +66,6 @@ package org.codehaus.stomp {
 				
   		public function Stomp() 
   		{
-
 		}
 	
 		public function connect( server : String = "localhost", port : int = 61613, connectHeaders : ConnectHeaders = null, socket: Socket = null) : void 
@@ -82,10 +79,29 @@ package org.codehaus.stomp {
 			doConnect();
 		}
 
-		public function exit() : void 
+		public function close() : void 
 		{
-			expectDisconnect = true;
-			socket.close();
+			if (connectTimer && connectTimer.running)
+				stopAutoReconnect();
+							
+			try {
+				if (socket.connected)
+					disconnect();
+					
+				socket.close();
+			} catch (e:Error) {
+					trace('Non-critical error closing socket ', e.toString());
+			}			
+		}
+		
+		public function stopAutoReconnect(): void
+		{
+			if (connectTimer)
+			{
+				connectTimer.stop();
+				connectTimer.removeEventListener(TimerEvent.TIMER, doConnectTimer);
+				connectTimer = null;				
+			}
 		}
 		
 		private function initializeSocket(): void
@@ -93,81 +109,83 @@ package org.codehaus.stomp {
 			socket.addEventListener( Event.CONNECT, onConnect );
 	  		socket.addEventListener( Event.CLOSE, onClose );
       		socket.addEventListener( ProgressEvent.SOCKET_DATA, onData );
-			socket.addEventListener( IOErrorEvent.IO_ERROR, onError );			
+			socket.addEventListener( IOErrorEvent.IO_ERROR, onError );
+			socket.addEventListener( SecurityErrorEvent.SECURITY_ERROR, onError);
 		}
 		
 		private function doConnect() : void 
 		{
-			if (socketConnected==true)
-				return;
-			socket.connect( server, int(port) );
-			socketConnected = false;
-			protocolConnected = false;
-			protocolPending = true;
-			expectDisconnect = false;
+			if (!socket.connected)
+				socket.connect( server, int(port) );
 		}
 
  	   	protected function onConnect( event:Event ) : void 
  	   	{
-			if (connectTimer && connectTimer.running) connectTimer.stop();
-			
-			dispatchEvent(event.clone());
+			if (connectTimer && connectTimer.running) 
+				stopAutoReconnect();
 			
 			var h : Object = connectHeaders ? connectHeaders.getHeaders() : {}; 
 			transmit("CONNECT", h);
-			socketConnected = true;
 			
-			this.dispatchEvent(event.clone());
+			dispatchEvent(event.clone());
     	}
-	
-		protected function onClose( event:Event ) : void 
-		{
-			socketConnected = false;
-			protocolConnected = false;
-			protocolPending = false;
-			disconnectTime = new Date();
-			
-			if (!expectDisconnect && autoReconnect) 
+    	
+    	protected function tryAutoreconnect() : void 
+    	{
+   			if (!socket.connected && autoReconnect && (connectTimer == null || !connectTimer.running)) 
 			{
-				connectTimer = new Timer(2000, 5);
+				// try every minute, repeating indefinitely (want it to be longer than socket timeouts)
+				connectTimer = new Timer(60000, 0);
 				connectTimer.addEventListener(TimerEvent.TIMER, doConnectTimer);
-				connectTimer.addEventListener(TimerEvent.TIMER_COMPLETE, onTimerComplete);
 				connectTimer.start();
 			}
-			
-			this.dispatchEvent(event.clone());
+    	}
+	
+		// these are always unexpected close events (they don't result from us calling socket.close() (see docs))
+		protected function onClose( event:Event ) : void 
+		{
+			disconnectTime = new Date();
+			tryAutoreconnect();
+			dispatchEvent(event.clone());
 		}
 
 		private function doConnectTimer( event:TimerEvent ):void 
 		{
-			doConnect();
+			if (!socket.connected) 
+			{
+				doConnect();
+			}
 		}
 		
-		private function onTimerComplete( event:TimerEvent ):void
-		{
-			if (!socket.connected) throw new Error("Unable to reconnect to socket");
-		} 
-		
-
 		private function onError( event:Event ) : void 
 		{
-			var now:Date = new Date();
-			if (!socket.connected) {
-				socketConnected = false;
-				protocolConnected = false;
-				protocolPending = false;
-				disconnectTime = now;
+			var now: Date = new Date();
+			
+			try {
+				socket.close();
+			} catch (io:IOError) {
+				trace('IOError', io.toString());
 			}
-			errorMessages.push(now + " " + event.type);
-			this.dispatchEvent(event.clone());
-		}
+
+			if (connectTimer != null && connectTimer.running) 
+			{
+				dispatchEvent(new ReconnectFailedEvent(ReconnectFailedEvent.RECONNECT_FAILED));
+			} 
+			else 
+			{
+				disconnectTime = now;
+				tryAutoreconnect();
+				
+				errorMessages.push(now + " " + event.type);
+				dispatchEvent(event.clone());
+			}
+		}	
 		
 		public function subscribe(destination : String, headers : SubscribeHeaders = null) : void 
 		{
-
 			var h : Object = headers ? headers.getHeaders() : null;
 				
-			if (socketConnected)
+			if (socket.connected)
 			{
 				if (!h) h = {};
 				
@@ -175,8 +193,7 @@ package org.codehaus.stomp {
 				transmit("SUBSCRIBE", h);
 			}
 			
-			subscriptions.push({destination: destination, headers: headers, connected: socketConnected});
-
+			subscriptions.push({destination: destination, headers: headers, connected: socket.connected});
 		}
 		
 		public function send (destination : String, message : Object, headers : SendHeaders = null) : void
@@ -287,7 +304,8 @@ package org.codehaus.stomp {
 	
 		private var frameReader : FrameReader;
 		
-	    private function onData(event : ProgressEvent):void {
+	    private function onData(event : ProgressEvent) : void 
+	    {
 	    	if (buffer.bytesAvailable == 0)
 	    		buffer.length = 0;
 	    	socket.readBytes(buffer, buffer.length, socket.bytesAvailable);
@@ -295,17 +313,22 @@ package org.codehaus.stomp {
 	    		// processFrame called once per iteration;
 	    	}
 	    }
-	    private function processFrame():Boolean {
-			if (!frameReader) {
+	    
+	    private function processFrame(): Boolean 
+	    {
+			if (!frameReader) 
 				frameReader = new FrameReader(buffer);
-			} else {
+			else 
 				frameReader.processBytes();
-			}
-			if (frameReader.isComplete) {
+			
+			if (frameReader.isComplete) 
+			{
 				dispatchFrame(frameReader.command, frameReader.headers, frameReader.body);
 				frameReader = null;
 				return true;
-			} else {
+			} 
+			else 
+			{
 				return false;
 			}
 		}
@@ -315,9 +338,6 @@ package org.codehaus.stomp {
 			switch (command) 
 			{				
 				case "CONNECTED":
-					protocolConnected = true;
-					protocolPending = false;
-					expectDisconnect = false;
 					connectTime = new Date();
 					sessionID = headers['session'];
 					processSubscriptions();
@@ -426,23 +446,33 @@ internal class FrameReader {
 		body.position=0;
 	}
 	
-	private function bodyComplete() : Boolean {
-		if(contentLength != -1) {
+	private function bodyComplete() : Boolean 
+	{
+		if(contentLength != -1) 
+		{
 			const len: int = body.length;
-			if(contentLength > reader.bytesAvailable + len) {
+			if(contentLength > reader.bytesAvailable + len) 
+			{
 				body.writeBytes(reader.readFor(reader.bytesAvailable));
 				return false;
-			} else {
+			} 
+			else 
+			{
 				body.writeBytes(reader.readFor(contentLength - len));
 			}
-		} else {
+		} 
+		else 
+		{
 			var nullByteIndex: int = reader.scan(0x00);
-			if(nullByteIndex != -1) {
-				if (nullByteIndex > 0) {
+			if(nullByteIndex != -1) 
+			{
+				if (nullByteIndex > 0) 
 					body.writeBytes(reader.readFor(nullByteIndex));	
-				}
+
 				contentLength = body.length;
-			} else {
+			} 
+			else 
+			{
 				body.writeBytes(reader.readFor(reader.bytesAvailable));
 				return false;
 			}
