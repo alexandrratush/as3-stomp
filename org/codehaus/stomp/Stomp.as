@@ -392,7 +392,6 @@ internal class FrameReader {
 		
 		if (command && headers && bodyProcessed)
 			frameComplete = true;
-						
 	}
 
 	private function processCommand(): void
@@ -421,7 +420,7 @@ internal class FrameReader {
 	
 	private function processBody(): void
 	{
-		while (reader.bytesAvailable > 0 && reader.peek(0) <= 27) {
+		while (reader.bytesAvailable > 0 && reader.peek(0x00) <= 27) {
 			reader.forward();
 		}
 		body.position=0;
