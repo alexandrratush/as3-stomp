@@ -15,26 +15,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
- /*
- 	Version 0.1 : R Jewson (rjewson at gmail dot com).  First release, only for reciept of messages.
- */
 
-package org.codehaus.stomp.event {
-	
-	import flash.events.Event;
-	import org.codehaus.stomp.frame.*;
+package org.codehaus.stomp.event
+{
 
-	public class STOMPErrorEvent extends Event 
-	{
-		static public const ERROR : String = "ErrorEvent";
-		
-		public var error : ErrorFrame;
-		
-		public function STOMPErrorEvent (eventType : String) 
-		{
-			super(eventType, true, false);
-		}
-		
-	}
+    import flash.events.Event;
+
+    import org.codehaus.stomp.frame.*;
+
+    public class STOMPErrorEvent extends Event
+    {
+        static public const ERROR:String = "ErrorEvent";
+
+        public var error:ErrorFrame;
+
+        public function STOMPErrorEvent(eventType:String)
+        {
+            super(eventType, true, false);
+        }
+
+        override public function clone():Event
+        {
+            return new STOMPErrorEvent(type);
+        }
+    }
 }
