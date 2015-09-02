@@ -1,4 +1,4 @@
-/**
+﻿/**
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -15,21 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ 
+ /*
+ 	Version 0.1 : R Jewson (rjewson at gmail dot com).  First release, only for reciept of messages.
+ */
 
-package org.codehaus.stomp.frame
-{
-	import flash.utils.ByteArray;
+package org.codehaus.stomp.event {
 	
-	public class ErrorFrame
+	import flash.events.Event;
+	import org.codehaus.stomp.frame.*;
+
+	public class ConnectedEvent extends Event 
 	{
-		public var body : ByteArray;
-		public var headers : Object;
-
-		public function ErrorFrame (body : ByteArray, headers : Object)
+		static public const CONNECTED : String = "connected";
+		
+		public function ConnectedEvent(eventType : String) 
 		{
-			this.body = body;
-			this.headers = headers;
+			super(eventType, true, false);
 		}
-
+		
+		
 	}
 }
