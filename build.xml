@@ -1,0 +1,19 @@
+<project name="Build swc" default="build" basedir=".">
+
+	<!-- SDKs properties -->
+	<property file="sdk.properties"/>
+	<!-- project properties -->
+	<property file="build.properties"/>
+	
+	<target name="build" description="Build swc">
+		<echo message="Building swc"/>
+			<java jar="${compc}" fork="true" failonerror="true">
+				<arg value="-load-config=${flex_config}"/>
+				<arg value="-swf-version=${swf_version}"/>
+				<arg value="-source-path+=${source_path}"/>
+				<arg value="-include-sources+=${source_path}"/>
+				<arg value="-output=${out_path}/${out_swc_name}"/>
+			</java>
+	</target>
+
+</project>
