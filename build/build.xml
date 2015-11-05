@@ -1,7 +1,5 @@
 <project name="Build swc" default="build" basedir="../">
 
-	<!-- SDKs properties -->
-	<property file="build/sdk.properties"/>
 	<!-- project properties -->
 	<property file="build/build.properties"/>
 	
