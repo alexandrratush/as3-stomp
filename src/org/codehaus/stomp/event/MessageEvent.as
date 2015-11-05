@@ -29,9 +29,9 @@ package org.codehaus.stomp.event
 
         public var message:MessageFrame;
 
-        public function MessageEvent(eventType:String)
+        public function MessageEvent(type:String)
         {
-            super(eventType, true, false);
+            super(type, true, false);
         }
 
         override public function clone():Event

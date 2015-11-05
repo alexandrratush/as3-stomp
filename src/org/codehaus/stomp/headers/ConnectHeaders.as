@@ -18,53 +18,53 @@
 
 package org.codehaus.stomp.headers
 {
-	public class ConnectHeaders extends Headers
-	{
-		/**
-		 * Specifies the JMS Client ID which is used in combination with the activemq.subcriptionName 
-		 * to denote a durable subscriber.
-		 **/
-		public static const CLIENT_ID : String = "client-id";
-		
-		public static const LOGIN : String = "login";
-		
-		public static const PASSCODE : String = "passcode";
-		
-		/**
-		 *  RabbitMQ/AMQP only
-		 */
-		public static const VIRTUAL_HOST: String = "virtual-host";
-		
-		/**
-		 *  RabbitMQ/AMQP only
-		 */
-		public static const REALM: String = "realm";
-		
-		
-		public function set clientID (id : String) : void
-		{
-			addHeader(CLIENT_ID, id);
-		}
-		
-		public function set login(username: String) : void
-		{
-			addHeader(LOGIN, username);
-		}
-		
-		public function set passcode(password: String) : void
-		{
-			addHeader(PASSCODE, password);
-		}
+    public class ConnectHeaders extends Headers
+    {
+        /**
+         * Specifies the JMS Client ID which is used in combination with the activemq.subcriptionName
+         * to denote a durable subscriber.
+         **/
+        public static const CLIENT_ID:String = "client-id";
 
-		public function set virtualHost(hostname: String) : void
-		{
-			addHeader(VIRTUAL_HOST, hostname);
-		}
-	
-		public function set realm(realm: String) : void
-		{
-			addHeader(REALM, realm);
-		}					
-		
-	}
+        public static const LOGIN:String = "login";
+
+        public static const PASSCODE:String = "passcode";
+
+        /**
+         *  RabbitMQ/AMQP only
+         */
+        public static const VIRTUAL_HOST:String = "virtual-host";
+
+        /**
+         *  RabbitMQ/AMQP only
+         */
+        public static const REALM:String = "realm";
+
+
+        public function set clientID(id:String):void
+        {
+            addHeader(CLIENT_ID, id);
+        }
+
+        public function set login(username:String):void
+        {
+            addHeader(LOGIN, username);
+        }
+
+        public function set passcode(password:String):void
+        {
+            addHeader(PASSCODE, password);
+        }
+
+        public function set virtualHost(hostname:String):void
+        {
+            addHeader(VIRTUAL_HOST, hostname);
+        }
+
+        public function set realm(realm:String):void
+        {
+            addHeader(REALM, realm);
+        }
+
+    }
 }

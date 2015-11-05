@@ -18,11 +18,11 @@
 
 package org.codehaus.stomp.headers
 {
-	public class BeginHeaders extends Headers
-	{	
-		public function set receipt (id : String) : void
-		{
-			addHeader(SharedHeaders.RECEIPT, id);
-		}
-	}
+    public class BeginHeaders extends Headers
+    {
+        public function set receipt(id:String):void
+        {
+            addHeader(SharedHeaders.RECEIPT, id);
+        }
+    }
 }

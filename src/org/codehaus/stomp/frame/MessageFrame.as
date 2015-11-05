@@ -18,19 +18,28 @@
 
 package org.codehaus.stomp.frame
 {
-	import flash.utils.ByteArray;
-	
-	public class MessageFrame
-	{
-		public var body : ByteArray;
-		public var headers : Object;
+    import flash.utils.ByteArray;
 
-		public function MessageFrame (body : ByteArray, headers : Object)
-		{
-			this.body = body;
-			this.headers = headers;
-		}
+    public class MessageFrame
+    {
+        private var _body:ByteArray;
+        private var _headers:Object;
 
-	}
+        public function MessageFrame(body:ByteArray, headers:Object)
+        {
+            _body = body;
+            _headers = headers;
+        }
+
+        public function get body():ByteArray
+        {
+            return _body;
+        }
+
+        public function get headers():Object
+        {
+            return _headers;
+        }
+    }
 
 }

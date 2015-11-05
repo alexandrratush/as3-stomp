@@ -29,9 +29,9 @@ package org.codehaus.stomp.event
 
         public var error:ErrorFrame;
 
-        public function STOMPErrorEvent(eventType:String)
+        public function STOMPErrorEvent(type:String)
         {
-            super(eventType, true, false);
+            super(type, true, false);
         }
 
         override public function clone():Event

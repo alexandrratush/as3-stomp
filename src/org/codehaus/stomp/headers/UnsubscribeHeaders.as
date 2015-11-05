@@ -18,24 +18,24 @@
 
 package org.codehaus.stomp.headers
 {
-	public class UnsubscribeHeaders extends Headers
-	{
-		public static const DESTINATION : String = "destination";
-		public static const ID : String = "id";
-		
-		public function set receipt (id : String) : void
-		{
-			addHeader(SharedHeaders.RECEIPT, id);
-		}
-		
-		public function set destination (destination : String) : void
-		{
-			addHeader(DESTINATION, destination);
-		}
-		
-		public function set id (id : String) : void
-		{
-			addHeader(ID, id);
-		}
-	}
+    public class UnSubscribeHeaders extends Headers
+    {
+        public static const DESTINATION:String = "destination";
+        public static const ID:String = "id";
+
+        public function set receipt(id:String):void
+        {
+            addHeader(SharedHeaders.RECEIPT, id);
+        }
+
+        public function set destination(destination:String):void
+        {
+            addHeader(DESTINATION, destination);
+        }
+
+        public function set id(id:String):void
+        {
+            addHeader(ID, id);
+        }
+    }
 }

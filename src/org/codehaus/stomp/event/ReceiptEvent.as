@@ -27,9 +27,9 @@ package org.codehaus.stomp.event
 
         public var receiptID:String;
 
-        public function ReceiptEvent(eventType:String)
+        public function ReceiptEvent(type:String)
         {
-            super(eventType, true, false);
+            super(type, true, false);
         }
 
         override public function clone():Event

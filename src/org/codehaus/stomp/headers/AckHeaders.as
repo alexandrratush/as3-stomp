@@ -19,18 +19,18 @@
 
 package org.codehaus.stomp.headers
 {
-	public class AckHeaders extends Headers
-	{
-		public static const TRANSACTION : String = 'transaction';
-		
-		public function set receipt (id : String) : void
-		{
-			addHeader(SharedHeaders.RECEIPT, id);
-		}
+    public class AckHeaders extends Headers
+    {
+        public static const TRANSACTION:String = 'transaction';
 
-		public function set transaction (id : String) : void
-		{
-			addHeader(TRANSACTION, id);
-		}
-	}
+        public function set receipt(id:String):void
+        {
+            addHeader(SharedHeaders.RECEIPT, id);
+        }
+
+        public function set transaction(id:String):void
+        {
+            addHeader(TRANSACTION, id);
+        }
+    }
 }

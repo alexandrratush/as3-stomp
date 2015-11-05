@@ -25,9 +25,9 @@ package org.codehaus.stomp.event
     {
         public static const CONNECTED:String = "connected";
 
-        public function ConnectedEvent(eventType:String)
+        public function ConnectedEvent(type:String)
         {
-            super(eventType, true, false);
+            super(type, true, false);
         }
 
         override public function clone():Event
