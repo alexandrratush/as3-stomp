@@ -42,10 +42,7 @@ package org.codehaus.stomp
         private static const BODY_START:String = "\n\n";
         private static const NULL_BYTE:int = 0x00;
 
-        public var errorMessages:Array = [];
         public var sessionID:String;
-        public var connectTime:Date;
-        public var disconnectTime:Date;
         public var autoReconnect:Boolean = true;
 
         private var _socket:Socket;
@@ -82,9 +79,7 @@ package org.codehaus.stomp
 
             try
             {
-                if (_socket.connected)
-                    disconnect();
-
+                if (_socket.connected) disconnect();
                 _socket.close();
             } catch (error:Error)
             {
@@ -162,7 +157,6 @@ package org.codehaus.stomp
         // these are always unexpected close events (they don't result from us calling _socket.close() (see docs))
         protected function onClose(event:Event):void
         {
-            disconnectTime = new Date();
             tryAutoreconnect();
             dispatchEvent(event);
         }
@@ -177,8 +171,6 @@ package org.codehaus.stomp
 
         private function onError(event:Event):void
         {
-            var now:Date = new Date();
-
             try
             {
                 _socket.close();
@@ -193,10 +185,7 @@ package org.codehaus.stomp
             }
             else
             {
-                disconnectTime = now;
                 tryAutoreconnect();
-
-                errorMessages.push(now + " " + event.type);
                 dispatchEvent(event);
             }
         }
@@ -315,7 +304,7 @@ package org.codehaus.stomp
             for each (var sub:Object in _subscriptions)
             {
                 if (sub["connected"] == false)
-                    this.subscribe(sub["destination"], SubscribeHeaders(sub["headers"]));
+                    subscribe(sub["destination"], SubscribeHeaders(sub["headers"]));
             }
         }
 
@@ -354,7 +343,6 @@ package org.codehaus.stomp
             switch (command)
             {
                 case "CONNECTED":
-                    connectTime = new Date();
                     sessionID = headers["session"];
                     processSubscriptions();
                     dispatchEvent(new ConnectedEvent(ConnectedEvent.CONNECTED));
@@ -382,6 +370,11 @@ package org.codehaus.stomp
 
             }
         }
+
+        public function get isConnected():Boolean
+        {
+            return _socket != null && _socket.connected;
+        }
     }
 }
 
@@ -394,9 +387,9 @@ import org.rxr.utils.ByteArrayReader;
 internal class FrameReader
 {
 
-    private var reader:ByteArrayReader;
-    private var frameComplete:Boolean = false;
-    private var contentLength:int = -1;
+    private var _byteArrayReader:ByteArrayReader;
+    private var _frameComplete:Boolean = false;
+    private var _contentLength:int = -1;
 
     public var command:String;
     public var headers:Object;
@@ -405,40 +398,40 @@ internal class FrameReader
 
     public function get isComplete():Boolean
     {
-        return frameComplete;
+        return _frameComplete;
     }
 
     public function readBytes(data:IDataInput):void
     {
-        data.readBytes(reader, reader.length, data.bytesAvailable);
+        data.readBytes(_byteArrayReader, _byteArrayReader.length, data.bytesAvailable);
         processBytes();
     }
 
     public function processBytes():void
     {
-        if (!command && reader.scan(0x0A) != -1)
+        if (!command && _byteArrayReader.scan(0x0A) != -1)
             processCommand();
 
-        if (command && !headers && reader.indexOfString("\n\n") != -1)
+        if (command && !headers && _byteArrayReader.indexOfString("\n\n") != -1)
             processHeaders();
 
         if (command && headers && (bodyProcessed = bodyComplete()))
             processBody();
 
         if (command && headers && bodyProcessed)
-            frameComplete = true;
+            _frameComplete = true;
     }
 
     private function processCommand():void
     {
-        command = reader.readLine();
+        command = _byteArrayReader.readLine();
     }
 
     private function processHeaders():void
     {
         headers = {};
 
-        var headerString:String = reader.readUntilString("\n\n");
+        var headerString:String = _byteArrayReader.readUntilString("\n\n");
         var headerValuePairs:Array = headerString.split("\n");
 
         for each (var pair:String in headerValuePairs)
@@ -448,48 +441,48 @@ internal class FrameReader
         }
 
         if (headers["content-length"])
-            contentLength = headers["content-length"];
+            _contentLength = headers["content-length"];
 
-        reader.forward();
+        _byteArrayReader.forward();
     }
 
     private function processBody():void
     {
-        while (reader.bytesAvailable > 0 && reader.peek(0x00) <= 27)
+        while (_byteArrayReader.bytesAvailable > 0 && _byteArrayReader.peek(0x00) <= 27)
         {
-            reader.forward();
+            _byteArrayReader.forward();
         }
         body.position = 0;
     }
 
     private function bodyComplete():Boolean
     {
-        if (contentLength != -1)
+        if (_contentLength != -1)
         {
             const len:int = body.length;
-            if (contentLength > reader.bytesAvailable + len)
+            if (_contentLength > _byteArrayReader.bytesAvailable + len)
             {
-                body.writeBytes(reader.readFor(reader.bytesAvailable));
+                body.writeBytes(_byteArrayReader.readFor(_byteArrayReader.bytesAvailable));
                 return false;
             }
             else
             {
-                body.writeBytes(reader.readFor(contentLength - len));
+                body.writeBytes(_byteArrayReader.readFor(_contentLength - len));
             }
         }
         else
         {
-            var nullByteIndex:int = reader.scan(0x00);
+            var nullByteIndex:int = _byteArrayReader.scan(0x00);
             if (nullByteIndex != -1)
             {
                 if (nullByteIndex > 0)
-                    body.writeBytes(reader.readFor(nullByteIndex));
+                    body.writeBytes(_byteArrayReader.readFor(nullByteIndex));
 
-                contentLength = body.length;
+                _contentLength = body.length;
             }
             else
             {
-                body.writeBytes(reader.readFor(reader.bytesAvailable));
+                body.writeBytes(_byteArrayReader.readFor(_byteArrayReader.bytesAvailable));
                 return false;
             }
         }
@@ -498,7 +491,7 @@ internal class FrameReader
 
     public function FrameReader(reader:ByteArrayReader):void
     {
-        this.reader = reader;
+        _byteArrayReader = reader;
         processBytes();
     }
 }
