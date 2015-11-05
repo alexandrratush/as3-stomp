@@ -19,24 +19,40 @@
 package org.codehaus.stomp.event
 {
 
+    import flash.events.ErrorEvent;
     import flash.events.Event;
 
     import org.codehaus.stomp.frame.*;
 
-    public class STOMPErrorEvent extends Event
+    public class STOMPErrorEvent extends ErrorEvent
     {
         static public const ERROR:String = "ErrorEvent";
+        static public const UNKNOWN_STOMP_FRAME:String = "unknownStompFrame";
+        static public const TRANSMIT_ERROR:String = "transmitError";
 
-        public var error:ErrorFrame;
+        private var _error:ErrorFrame;
+        private var _command:String;
 
-        public function STOMPErrorEvent(type:String)
+        public function STOMPErrorEvent(type:String, error:ErrorFrame, command:String = "")
         {
+            _error = error;
+            _command = command;
             super(type, true, false);
         }
 
         override public function clone():Event
         {
-            return new STOMPErrorEvent(type);
+            return new STOMPErrorEvent(type, error, command);
+        }
+
+        public function get error():ErrorFrame
+        {
+            return _error;
+        }
+
+        public function get command():String
+        {
+            return _command;
         }
     }
 }

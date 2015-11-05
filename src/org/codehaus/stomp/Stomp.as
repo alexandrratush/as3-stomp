@@ -50,6 +50,7 @@ package org.codehaus.stomp
 
         private var _socket:Socket;
         private var _byteArrayReader:ByteArrayReader;
+        private var _frameReader:FrameReader;
         private var _server:String;
         private var _port:int;
         private var _connectHeaders:ConnectHeaders;
@@ -69,7 +70,8 @@ package org.codehaus.stomp
             _connectHeaders = connectHeaders;
             _socket = socket || new Socket();
 
-            initializeSocket();
+            removeSocketEventListeners();
+            addSocketEventListeners();
             doConnect();
         }
 
@@ -84,9 +86,9 @@ package org.codehaus.stomp
                     disconnect();
 
                 _socket.close();
-            } catch (e:Error)
+            } catch (error:Error)
             {
-                trace('Non-critical error closing _socket ', e.toString());
+                trace("Non-critical error closing _socket ", error.toString());
             }
         }
 
@@ -100,7 +102,7 @@ package org.codehaus.stomp
             }
         }
 
-        private function initializeSocket():void
+        private function addSocketEventListeners():void
         {
             _socket.addEventListener(Event.CONNECT, onConnect);
             _socket.addEventListener(Event.CLOSE, onClose);
@@ -109,10 +111,30 @@ package org.codehaus.stomp
             _socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onError);
         }
 
+        private function removeSocketEventListeners():void
+        {
+            if (_socket != null)
+            {
+                _socket.addEventListener(Event.CONNECT, onConnect);
+                _socket.addEventListener(Event.CLOSE, onClose);
+                _socket.addEventListener(ProgressEvent.SOCKET_DATA, onData);
+                _socket.addEventListener(IOErrorEvent.IO_ERROR, onError);
+                _socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onError);
+            }
+        }
+
         private function doConnect():void
         {
             if (!_socket.connected)
-                _socket.connect(_server, int(_port));
+            {
+                try
+                {
+                    _socket.connect(_server, int(_port));
+                } catch (error:Error)
+                {
+                    trace("doConnect error: " + error.toString());
+                }
+            }
         }
 
         protected function onConnect(event:Event):void
@@ -123,7 +145,7 @@ package org.codehaus.stomp
             var h:Object = _connectHeaders ? _connectHeaders.getHeaders() : {};
             transmit("CONNECT", h);
 
-            dispatchEvent(event.clone());
+            dispatchEvent(event);
         }
 
         protected function tryAutoreconnect():void
@@ -142,7 +164,7 @@ package org.codehaus.stomp
         {
             disconnectTime = new Date();
             tryAutoreconnect();
-            dispatchEvent(event.clone());
+            dispatchEvent(event);
         }
 
         private function doConnectTimer(event:TimerEvent):void
@@ -160,9 +182,9 @@ package org.codehaus.stomp
             try
             {
                 _socket.close();
-            } catch (io:IOError)
+            } catch (error:IOError)
             {
-                trace('IOError', io.toString());
+                trace("IOError", error.toString());
             }
 
             if (_connectTimer != null && _connectTimer.running)
@@ -175,19 +197,16 @@ package org.codehaus.stomp
                 tryAutoreconnect();
 
                 errorMessages.push(now + " " + event.type);
-                dispatchEvent(event.clone());
+                dispatchEvent(event);
             }
         }
 
         public function subscribe(destination:String, headers:SubscribeHeaders = null):void
         {
-            var h:Object = headers ? headers.getHeaders() : null;
-
             if (_socket.connected)
             {
-                if (!h) h = {};
-
-                h['destination'] = destination;
+                var h:Object = headers ? headers.getHeaders() : {};
+                h["destination"] = destination;
                 transmit("SUBSCRIBE", h);
             }
 
@@ -197,7 +216,7 @@ package org.codehaus.stomp
         public function send(destination:String, message:Object, headers:SendHeaders = null):void
         {
             var h:Object = headers ? headers.getHeaders() : {};
-            h['destination'] = destination;
+            h["destination"] = destination;
 
             var messageBytes:ByteArray = new ByteArray();
             if (message is ByteArray)
@@ -213,7 +232,7 @@ package org.codehaus.stomp
             else
                 messageBytes.writeObject(message);
 
-            h['content-length'] = messageBytes.length;
+            h["content-length"] = messageBytes.length;
 
             transmit("SEND", h, messageBytes);
         }
@@ -221,7 +240,7 @@ package org.codehaus.stomp
         public function sendTextMessage(destination:String, message:String, headers:SendHeaders = null):void
         {
             var h:Object = headers ? headers.getHeaders() : {};
-            h['destination'] = destination;
+            h["destination"] = destination;
 
             var messageBytes:ByteArray = new ByteArray();
             messageBytes.writeUTFBytes(message);
@@ -232,40 +251,35 @@ package org.codehaus.stomp
         public function begin(transaction:String, headers:BeginHeaders = null):void
         {
             var h:Object = headers ? headers.getHeaders() : {};
-
-            h['transaction'] = transaction;
+            h["transaction"] = transaction;
             transmit("BEGIN", h);
         }
 
         public function commit(transaction:String, headers:CommitHeaders = null):void
         {
             var h:Object = headers ? headers.getHeaders() : {};
-
-            h['transaction'] = transaction;
+            h["transaction"] = transaction;
             transmit("COMMIT", h);
         }
 
         public function ack(messageID:String, headers:AckHeaders = null):void
         {
             var h:Object = headers ? headers.getHeaders() : {};
-
-            h['message-id'] = messageID;
+            h["message-id"] = messageID;
             transmit("ACK", h);
         }
 
         public function abort(transaction:String, headers:AbortHeaders = null):void
         {
             var h:Object = headers ? headers.getHeaders() : {};
-
-            h['transaction'] = transaction;
+            h["transaction"] = transaction;
             transmit("ABORT", h);
         }
 
         public function unsubscribe(destination:String, headers:UnSubscribeHeaders = null):void
         {
             var h:Object = headers ? headers.getHeaders() : {};
-
-            h['destination'] = destination;
+            h["destination"] = destination;
             transmit("UNSUBSCRIBE", h);
         }
 
@@ -283,23 +297,27 @@ package org.codehaus.stomp
                 transmission.writeUTFBytes(NEWLINE + header + ":" + headers[header]);
 
             transmission.writeUTFBytes(BODY_START);
-            if (body) transmission.writeBytes(body, 0, body.length);
+            if (body != null) transmission.writeBytes(body, 0, body.length);
             transmission.writeByte(NULL_BYTE);
 
-            _socket.writeBytes(transmission, 0, transmission.length);
-            _socket.flush();
+            try
+            {
+                _socket.writeBytes(transmission, 0, transmission.length);
+                _socket.flush();
+            } catch (error:Error)
+            {
+                dispatchEvent(new STOMPErrorEvent(STOMPErrorEvent.TRANSMIT_ERROR, new ErrorFrame(body, headers), command));
+            }
         }
 
         private function processSubscriptions():void
         {
             for each (var sub:Object in _subscriptions)
             {
-                if (sub['connected'] == false)
-                    this.subscribe(sub['destination'], SubscribeHeaders(sub['headers']));
+                if (sub["connected"] == false)
+                    this.subscribe(sub["destination"], SubscribeHeaders(sub["headers"]));
             }
         }
-
-        private var frameReader:FrameReader;
 
         private function onData(event:ProgressEvent):void
         {
@@ -314,15 +332,15 @@ package org.codehaus.stomp
 
         private function processFrame():Boolean
         {
-            if (!frameReader)
-                frameReader = new FrameReader(_byteArrayReader);
+            if (!_frameReader)
+                _frameReader = new FrameReader(_byteArrayReader);
             else
-                frameReader.processBytes();
+                _frameReader.processBytes();
 
-            if (frameReader.isComplete)
+            if (_frameReader.isComplete)
             {
-                dispatchFrame(frameReader.command, frameReader.headers, frameReader.body);
-                frameReader = null;
+                dispatchFrame(_frameReader.command, _frameReader.headers, _frameReader.body);
+                _frameReader = null;
                 return true;
             }
             else
@@ -337,7 +355,7 @@ package org.codehaus.stomp
             {
                 case "CONNECTED":
                     connectTime = new Date();
-                    sessionID = headers['session'];
+                    sessionID = headers["session"];
                     processSubscriptions();
                     dispatchEvent(new ConnectedEvent(ConnectedEvent.CONNECTED));
                     break;
@@ -350,18 +368,16 @@ package org.codehaus.stomp
 
                 case "RECEIPT":
                     var receiptEvent:ReceiptEvent = new ReceiptEvent(ReceiptEvent.RECEIPT);
-                    receiptEvent.receiptID = headers['receipt-id'];
+                    receiptEvent.receiptID = headers["receipt-id"];
                     dispatchEvent(receiptEvent);
                     break;
 
                 case "ERROR":
-                    var errorEvent:STOMPErrorEvent = new STOMPErrorEvent(STOMPErrorEvent.ERROR);
-                    errorEvent.error = new ErrorFrame(body, headers);
-                    dispatchEvent(errorEvent);
+                    dispatchEvent(new STOMPErrorEvent(STOMPErrorEvent.ERROR, new ErrorFrame(body, headers)));
                     break;
 
                 default:
-                    throw new Error("UNKNOWN STOMP FRAME '" + command + "'");
+                    dispatchEvent(new STOMPErrorEvent(STOMPErrorEvent.UNKNOWN_STOMP_FRAME, new ErrorFrame(body, headers)));
                     break;
 
             }
