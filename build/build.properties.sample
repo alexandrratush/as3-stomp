@@ -1,8 +1,4 @@
-# The location of the SDKs.
-AIR_SDK_ROOT = D:/ProgramFiles/AIRSDK_Compiler
-
-# config files
-flex_config = ${AIR_SDK_ROOT}/frameworks/flex-config.xml
-
-# path to compiler jars
-compc = ${AIR_SDK_ROOT}/lib/compc-cli.jar
+source_path = src
+out_path = bin
+out_swc_name = stomp.swc
+swf_version = 18

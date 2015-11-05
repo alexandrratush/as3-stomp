@@ -1,9 +1,9 @@
-<project name="Build swc" default="build" basedir=".">
+<project name="Build swc" default="build" basedir="../">
 
 	<!-- SDKs properties -->
-	<property file="sdk.properties"/>
+	<property file="build/sdk.properties"/>
 	<!-- project properties -->
-	<property file="build.properties"/>
+	<property file="build/build.properties"/>
 	
 	<target name="build" description="Build swc">
 		<echo message="Building swc"/>
