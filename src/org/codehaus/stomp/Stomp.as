@@ -17,11 +17,9 @@
  */
 package org.codehaus.stomp
 {
-    import flash.errors.IOError;
     import flash.events.*;
     import flash.net.Socket;
     import flash.utils.ByteArray;
-    import flash.utils.Timer;
 
     import org.codehaus.stomp.event.*;
     import org.codehaus.stomp.frame.*;
@@ -32,7 +30,6 @@ package org.codehaus.stomp
     [Event(name="message", type="org.codehaus.stomp.event.MessageEvent")]
     [Event(name="receipt", type="org.codehaus.stomp.event.ReceiptEvent")]
     [Event(name="fault", type="org.codehaus.stomp.event.STOMPErrorEvent")]
-    [Event(name="reconnectFailed", type="org.codehaus.stomp.event.ReconnectFailedEvent")]
     [Event(name="ioError", type="flash.events.IOErrorEvent")]
     [Event(name="securityError", type="flash.events.SecurityErrorEvent")]
 
@@ -42,8 +39,6 @@ package org.codehaus.stomp
         private static const BODY_START:String = "\n\n";
         private static const NULL_BYTE:int = 0x00;
 
-        public var autoReconnect:Boolean = true;
-
         private var _socket:Socket;
         private var _byteArrayReader:ByteArrayReader;
         private var _frameReader:FrameReader;
@@ -51,7 +46,6 @@ package org.codehaus.stomp
         private var _port:int;
         private var _connectHeaders:ConnectHeaders;
         private var _sessionID:String;
-        private var _connectTimer:Timer;
         private var _subscriptions:Array;
 
         public function Stomp()
@@ -74,9 +68,6 @@ package org.codehaus.stomp
 
         public function close():void
         {
-            if (_connectTimer && _connectTimer.running)
-                stopAutoReconnect();
-
             try
             {
                 if (_socket.connected) disconnect();
@@ -84,16 +75,6 @@ package org.codehaus.stomp
             } catch (error:Error)
             {
                 trace("Non-critical error closing _socket ", error.toString());
-            }
-        }
-
-        public function stopAutoReconnect():void
-        {
-            if (_connectTimer)
-            {
-                _connectTimer.stop();
-                _connectTimer.removeEventListener(TimerEvent.TIMER, doConnectTimer);
-                _connectTimer = null;
             }
         }
 
@@ -134,39 +115,16 @@ package org.codehaus.stomp
 
         protected function onConnect(event:Event):void
         {
-            if (_connectTimer && _connectTimer.running)
-                stopAutoReconnect();
-
             var h:Object = _connectHeaders ? _connectHeaders.getHeaders() : {};
             transmit("CONNECT", h);
 
             dispatchEvent(event);
         }
 
-        protected function tryAutoreconnect():void
-        {
-            if (!_socket.connected && autoReconnect && (_connectTimer == null || !_connectTimer.running))
-            {
-                // try every minute, repeating indefinitely (want it to be longer than _socket timeouts)
-                _connectTimer = new Timer(60000, 0);
-                _connectTimer.addEventListener(TimerEvent.TIMER, doConnectTimer);
-                _connectTimer.start();
-            }
-        }
-
         // these are always unexpected close events (they don't result from us calling _socket.close() (see docs))
         protected function onClose(event:Event):void
         {
-            tryAutoreconnect();
             dispatchEvent(event);
-        }
-
-        private function doConnectTimer(event:TimerEvent):void
-        {
-            if (!_socket.connected)
-            {
-                doConnect();
-            }
         }
 
         private function onError(event:Event):void
@@ -174,20 +132,11 @@ package org.codehaus.stomp
             try
             {
                 _socket.close();
-            } catch (error:IOError)
+            } catch (error:Error)
             {
-                trace("IOError", error.toString());
+                trace("Non-critical error closing _socket ", error.toString());
             }
-
-            if (_connectTimer != null && _connectTimer.running)
-            {
-                dispatchEvent(new ReconnectFailedEvent(ReconnectFailedEvent.RECONNECT_FAILED));
-            }
-            else
-            {
-                tryAutoreconnect();
-                dispatchEvent(event);
-            }
+            dispatchEvent(event);
         }
 
         public function subscribe(destination:String, headers:SubscribeHeaders = null):void
