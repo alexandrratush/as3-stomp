@@ -42,7 +42,6 @@ package org.codehaus.stomp
         private static const BODY_START:String = "\n\n";
         private static const NULL_BYTE:int = 0x00;
 
-        public var sessionID:String;
         public var autoReconnect:Boolean = true;
 
         private var _socket:Socket;
@@ -51,6 +50,7 @@ package org.codehaus.stomp
         private var _server:String;
         private var _port:int;
         private var _connectHeaders:ConnectHeaders;
+        private var _sessionID:String;
         private var _connectTimer:Timer;
         private var _subscriptions:Array;
 
@@ -343,7 +343,7 @@ package org.codehaus.stomp
             switch (command)
             {
                 case "CONNECTED":
-                    sessionID = headers["session"];
+                    _sessionID = headers["session"];
                     processSubscriptions();
                     dispatchEvent(new ConnectedEvent(ConnectedEvent.CONNECTED));
                     break;
@@ -374,6 +374,11 @@ package org.codehaus.stomp
         public function get isConnected():Boolean
         {
             return _socket != null && _socket.connected;
+        }
+
+        public function get sessionID():String
+        {
+            return _sessionID;
         }
     }
 }
